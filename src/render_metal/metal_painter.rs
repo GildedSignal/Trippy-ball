@@ -1,5 +1,6 @@
-use crate::ui;
+#[cfg(target_os = "macos")]
 use crate::memory::pod::Pod;
+use crate::ui;
 
 #[cfg(target_os = "macos")]
 use egui::epaint::Primitive;

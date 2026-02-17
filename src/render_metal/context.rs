@@ -1,5 +1,6 @@
 use super::metal_painter::MetalPainter;
 use super::surface::MetalSurface;
+#[cfg(target_os = "macos")]
 use crate::memory::pod::{self, Pod};
 use crate::render::CameraUniform;
 use crate::ui;
@@ -112,6 +113,10 @@ struct MetalColorUniform {
     slice_plane_offsets: [f32; 4],
     slice_plane_enabled: [u32; 4],
     slice_plane_ops: [u32; 4],
+    point_count: u32,
+    density_padding: [u32; 3],
+    point_density_scale: f32,
+    density_params_padding: [f32; 3],
 }
 #[cfg(target_os = "macos")]
 unsafe impl Pod for MetalColorUniform {}
@@ -231,6 +236,13 @@ impl MetalContext {
             .object_at(0)
             .ok_or_else(|| "missing color attachment 0".to_string())?;
         color_attachment.set_pixel_format(metal::MTLPixelFormat::BGRA8Unorm_sRGB);
+        color_attachment.set_blending_enabled(true);
+        color_attachment.set_source_rgb_blend_factor(metal::MTLBlendFactor::SourceAlpha);
+        color_attachment.set_destination_rgb_blend_factor(metal::MTLBlendFactor::One);
+        color_attachment.set_rgb_blend_operation(metal::MTLBlendOperation::Add);
+        color_attachment.set_source_alpha_blend_factor(metal::MTLBlendFactor::One);
+        color_attachment.set_destination_alpha_blend_factor(metal::MTLBlendFactor::One);
+        color_attachment.set_alpha_blend_operation(metal::MTLBlendOperation::Add);
 
         let point_pipeline = device
             .new_render_pipeline_state(&render_desc)
@@ -460,6 +472,10 @@ impl MetalContext {
             slice_plane_offsets: color_params.slice_plane_offsets,
             slice_plane_enabled: color_params.slice_plane_enabled,
             slice_plane_ops: color_params.slice_plane_ops,
+            point_count: encoded_points as u32,
+            density_padding: [0; 3],
+            point_density_scale: ((encoded_points as f32) / 250_000.0).max(1.0).sqrt(),
+            density_params_padding: [0.0; 3],
         };
         Self::write_pod(self.color_buffer.as_ref(), &color_uniform)?;
 
@@ -754,6 +770,8 @@ impl MetalContext {
     pub fn resize_surface(&mut self, _width: u32, _height: u32) {}
 
     pub fn reserve_for_point_count(&mut self, _effective_point_count: usize) {}
+
+    pub fn mark_positions_dirty(&mut self) {}
 
     pub fn render_presented_frame(
         &mut self,

@@ -21,6 +21,7 @@ use std::time::{Duration, Instant};
 
 use super::buffer_pool::GlobalBufferPool;
 
+#[cfg(target_os = "macos")]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct GpuWavefunctionParams {
@@ -40,8 +41,10 @@ pub struct GpuWavefunctionParams {
     pub compute_count: u32,
 }
 
+#[cfg(target_os = "macos")]
 unsafe impl Pod for GpuWavefunctionParams {}
 
+#[cfg(target_os = "macos")]
 impl From<&WavefunctionParams> for GpuWavefunctionParams {
     fn from(params: &WavefunctionParams) -> Self {
         Self {
@@ -63,12 +66,14 @@ impl From<&WavefunctionParams> for GpuWavefunctionParams {
     }
 }
 
+#[cfg(target_os = "macos")]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct GpuPositionData {
     pub position: [f32; 3],
 }
 
+#[cfg(target_os = "macos")]
 unsafe impl Pod for GpuPositionData {}
 
 #[derive(Debug)]
