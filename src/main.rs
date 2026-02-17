@@ -126,11 +126,12 @@ impl App {
         self.renderer.set_color_scheme(color_scheme);
         self.renderer.set_slice_settings(slice_settings);
         let auto = self.renderer.auto_tone_output();
-        self.ui_state.set_auto_tone_diagnostics(ui::AutoToneDiagnostics {
-            exposure_black: auto.exposure_black,
-            exposure_white: auto.exposure_white,
-            luminance_threshold: auto.luminance_threshold,
-        });
+        self.ui_state
+            .set_auto_tone_diagnostics(ui::AutoToneDiagnostics {
+                exposure_black: auto.exposure_black,
+                exposure_white: auto.exposure_white,
+                luminance_threshold: auto.luminance_threshold,
+            });
 
         // Update buffer pool statistics if available
         let stats = self.renderer.get_buffer_pool_stats();

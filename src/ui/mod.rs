@@ -6,12 +6,12 @@
 mod controls;
 mod input_bridge;
 
+use crate::debug;
 use crate::math::presets::{get_all_presets, get_preset_by_name};
 use crate::math::WavefunctionParams;
 use crate::render::color::ColorScheme;
 use crate::render::BufferPoolStats;
 use crate::render::PointCloudDebugInfo;
-use crate::debug;
 use egui::{ClippedPrimitive, ComboBox, Context, Slider, TexturesDelta};
 use input_bridge::InputBridge;
 use winit::window::Window;
@@ -703,7 +703,11 @@ fn build_ui(ctx: &Context, data: &mut UiData) -> UiOutput {
 
             let mut z = data.params.z;
             if ui
-                .add(Slider::new(&mut z, 1.0..=6.0).step_by(1.0).text("Nuclear Charge Z"))
+                .add(
+                    Slider::new(&mut z, 1.0..=6.0)
+                        .step_by(1.0)
+                        .text("Nuclear Charge Z"),
+                )
                 .changed()
             {
                 let mut new_params = data.params;
@@ -800,15 +804,18 @@ fn build_ui(ctx: &Context, data: &mut UiData) -> UiOutput {
             ui.separator();
             ui.heading("Slicing");
             ui.label("Combine X/Y/Z plane slices using additive or subtractive modes.");
-            ui.add(
-                Slider::new(&mut data.slice_settings.thickness, 0.05..=10.0).text("Slice Thickness"),
-            );
+            let thickness_changed = ui
+                .add(
+                    Slider::new(&mut data.slice_settings.thickness, 0.05..=10.0)
+                        .text("Slice Thickness"),
+                )
+                .changed();
 
             let mut slice_changed = false;
             slice_changed |= slice_plane_row(ui, "X Plane", &mut data.slice_settings.x_plane);
             slice_changed |= slice_plane_row(ui, "Y Plane", &mut data.slice_settings.y_plane);
             slice_changed |= slice_plane_row(ui, "Z Plane", &mut data.slice_settings.z_plane);
-            if slice_changed {
+            if thickness_changed || slice_changed {
                 output.slice_settings = Some(data.slice_settings);
             }
 

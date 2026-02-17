@@ -36,6 +36,13 @@ pub struct MetalRenderer {
     auto_tone_enabled: bool,
 }
 
+fn slice_op_code(op: ui::SliceOperation) -> u32 {
+    match op {
+        ui::SliceOperation::Subtractive => 0,
+        ui::SliceOperation::Additive => 1,
+    }
+}
+
 impl MetalRenderer {
     pub fn new(window: &Window, point_count: usize) -> Result<Self, String> {
         info!("Creating Metal renderer bridge");
@@ -158,26 +165,32 @@ impl MetalRenderer {
         use_log_scale: bool,
     ) {
         let auto = self.inner.auto_tone_output();
-        let (final_gamma, final_contrast, final_brightness, final_threshold, exposure_black, exposure_white) =
-            if self.auto_tone_enabled {
-                (
-                    auto.gamma,
-                    auto.contrast,
-                    auto.brightness,
-                    auto.luminance_threshold,
-                    auto.exposure_black,
-                    auto.exposure_white,
-                )
-            } else {
-                (
-                    gamma,
-                    contrast,
-                    brightness,
-                    self.native_color_params.luminance_threshold,
-                    0.0,
-                    1.0,
-                )
-            };
+        let (
+            final_gamma,
+            final_contrast,
+            final_brightness,
+            final_threshold,
+            exposure_black,
+            exposure_white,
+        ) = if self.auto_tone_enabled {
+            (
+                auto.gamma,
+                auto.contrast,
+                auto.brightness,
+                auto.luminance_threshold,
+                auto.exposure_black,
+                auto.exposure_white,
+            )
+        } else {
+            (
+                gamma,
+                contrast,
+                brightness,
+                self.native_color_params.luminance_threshold,
+                0.0,
+                1.0,
+            )
+        };
 
         self.native_color_params = context::MetalColorParams {
             gamma: final_gamma,
@@ -188,6 +201,7 @@ impl MetalRenderer {
             luminance_threshold: final_threshold,
             exposure_black,
             exposure_white,
+            ..self.native_color_params
         };
         self.inner
             .set_color_map_params(gamma, contrast, brightness, use_log_scale);
@@ -202,6 +216,36 @@ impl MetalRenderer {
     pub fn set_color_scheme(&mut self, scheme: ColorScheme) {
         self.native_color_params.color_scheme = scheme;
         self.inner.set_color_scheme(scheme);
+    }
+
+    pub fn set_slice_settings(&mut self, settings: ui::SliceSettings) {
+        self.native_color_params.slice_thickness = settings.thickness.max(1e-4);
+        self.native_color_params.slice_plane_offsets = [
+            settings.x_plane.offset,
+            settings.y_plane.offset,
+            settings.z_plane.offset,
+            0.0,
+        ];
+        self.native_color_params.slice_plane_enabled = [
+            u32::from(settings.x_plane.enabled),
+            u32::from(settings.y_plane.enabled),
+            u32::from(settings.z_plane.enabled),
+            0,
+        ];
+        self.native_color_params.slice_plane_ops = [
+            slice_op_code(settings.x_plane.operation),
+            slice_op_code(settings.y_plane.operation),
+            slice_op_code(settings.z_plane.operation),
+            0,
+        ];
+        self.native_color_params.slice_has_additive = u32::from(
+            (settings.x_plane.enabled
+                && settings.x_plane.operation == ui::SliceOperation::Additive)
+                || (settings.y_plane.enabled
+                    && settings.y_plane.operation == ui::SliceOperation::Additive)
+                || (settings.z_plane.enabled
+                    && settings.z_plane.operation == ui::SliceOperation::Additive),
+        );
     }
 
     pub fn get_buffer_pool_stats(&self) -> BufferPoolStats {

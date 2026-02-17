@@ -32,6 +32,11 @@ pub struct MetalColorParams {
     pub luminance_threshold: f32,
     pub exposure_black: f32,
     pub exposure_white: f32,
+    pub slice_thickness: f32,
+    pub slice_has_additive: u32,
+    pub slice_plane_offsets: [f32; 4],
+    pub slice_plane_enabled: [u32; 4],
+    pub slice_plane_ops: [u32; 4],
 }
 
 impl Default for MetalColorParams {
@@ -45,6 +50,11 @@ impl Default for MetalColorParams {
             luminance_threshold: 0.0,
             exposure_black: 0.0,
             exposure_white: 1.0,
+            slice_thickness: 0.5,
+            slice_has_additive: 0,
+            slice_plane_offsets: [0.0; 4],
+            slice_plane_enabled: [0; 4],
+            slice_plane_ops: [0; 4],
         }
     }
 }
@@ -96,6 +106,12 @@ struct MetalColorUniform {
     color_scheme: u32,
     exposure_black: f32,
     exposure_white: f32,
+    slice_thickness: f32,
+    slice_has_additive: u32,
+    slice_padding: [u32; 2],
+    slice_plane_offsets: [f32; 4],
+    slice_plane_enabled: [u32; 4],
+    slice_plane_ops: [u32; 4],
 }
 #[cfg(target_os = "macos")]
 unsafe impl Pod for MetalColorUniform {}
@@ -438,6 +454,12 @@ impl MetalContext {
             exposure_white: color_params
                 .exposure_white
                 .max(color_params.exposure_black + 1e-6),
+            slice_thickness: color_params.slice_thickness.max(1e-4),
+            slice_has_additive: color_params.slice_has_additive,
+            slice_padding: [0; 2],
+            slice_plane_offsets: color_params.slice_plane_offsets,
+            slice_plane_enabled: color_params.slice_plane_enabled,
+            slice_plane_ops: color_params.slice_plane_ops,
         };
         Self::write_pod(self.color_buffer.as_ref(), &color_uniform)?;
 

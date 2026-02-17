@@ -22,6 +22,12 @@ struct ColorMapParams {
     uint color_scheme;
     float exposure_black;
     float exposure_white;
+    float slice_thickness;
+    uint slice_has_additive;
+    uint2 slice_padding;
+    float4 slice_plane_offsets;
+    uint4 slice_plane_enabled;
+    uint4 slice_plane_ops;
 };
 
 struct CullCounter {
@@ -59,6 +65,35 @@ inline float map_intensity(float intensity, constant ColorMapParams& color) {
     return clamp(mapped, 0.0, 1.0);
 }
 
+inline bool plane_slice_mask(float coord, float offset, float half_thickness) {
+    return fabs(coord - offset) <= half_thickness;
+}
+
+inline bool passes_slice_mask(float3 position, constant ColorMapParams& color) {
+    float half_thickness = max(color.slice_thickness * 0.5, 1e-5);
+    float coords[3] = {position.x, position.y, position.z};
+    bool has_enabled = false;
+    bool include = color.slice_has_additive != 0u ? false : true;
+
+    for (uint axis = 0u; axis < 3u; ++axis) {
+        if (color.slice_plane_enabled[axis] == 0u) {
+            continue;
+        }
+
+        has_enabled = true;
+        bool in_slice = plane_slice_mask(coords[axis], color.slice_plane_offsets[axis], half_thickness);
+        bool additive = color.slice_plane_ops[axis] != 0u;
+
+        if (additive) {
+            include = include || in_slice;
+        } else {
+            include = include && !in_slice;
+        }
+    }
+
+    return has_enabled ? include : true;
+}
+
 kernel void cull_points(
     const device packed_float3* positions [[buffer(0)]],
     const device float* intensities [[buffer(1)]],
@@ -74,6 +109,10 @@ kernel void cull_points(
     }
 
     float3 position = float3(positions[gid]);
+    if (!passes_slice_mask(position, color)) {
+        return;
+    }
+
     float4 clip = camera.view_proj * float4(position, 1.0);
     if (!is_inside_clip_space(clip)) {
         return;

@@ -17,6 +17,12 @@ struct ColorMapParams {
     uint color_scheme;
     float exposure_black;
     float exposure_white;
+    float slice_thickness;
+    uint slice_has_additive;
+    uint2 slice_padding;
+    float4 slice_plane_offsets;
+    uint4 slice_plane_enabled;
+    uint4 slice_plane_ops;
 };
 
 struct VertexOut {
