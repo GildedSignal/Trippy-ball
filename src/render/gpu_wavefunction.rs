@@ -4,12 +4,19 @@
 // On macOS this uses native Metal compute + shared-memory readback staging.
 // Non-macOS builds keep a lightweight CPU fallback for compilation.
 
-use crate::math::{gpu_normalization_table_f32_flat, WavefunctionParams, GPU_NORMALIZATION_MAX_L};
-use crate::memory::pod::{self, Pod};
-use crate::{debug, info, warn};
+use crate::math::WavefunctionParams;
+#[cfg(target_os = "macos")]
+use crate::math::{gpu_normalization_table_f32_flat, GPU_NORMALIZATION_MAX_L};
+use crate::memory::pod::Pod;
+#[cfg(target_os = "macos")]
+use crate::memory::pod;
+#[cfg(target_os = "macos")]
+use crate::{debug, info};
+use crate::warn;
 use glam::Vec3;
 use std::collections::VecDeque;
 use std::sync::Arc;
+#[cfg(target_os = "macos")]
 use std::time::{Duration, Instant};
 
 use super::buffer_pool::GlobalBufferPool;

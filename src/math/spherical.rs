@@ -450,11 +450,12 @@ pub fn real_spherical_harmonic_batch(l: usize, m: isize, thetas: &[f64], phis: &
 #[cfg(target_arch = "x86_64")]
 #[inline]
 unsafe fn _mm256_cos_pd(a: __m256d) -> __m256d {
-    // Extract values, apply cos, and create a new vector
+    // Store lanes to scalar array, apply cos, then reload.
+    let mut values = [0.0f64; 4];
+    _mm256_storeu_pd(values.as_mut_ptr(), a);
     let mut result = [0.0f64; 4];
     for i in 0..4 {
-        let val = *a.as_ptr().add(i);
-        result[i] = val.cos();
+        result[i] = values[i].cos();
     }
     _mm256_loadu_pd(result.as_ptr())
 }
@@ -463,11 +464,12 @@ unsafe fn _mm256_cos_pd(a: __m256d) -> __m256d {
 #[cfg(target_arch = "x86_64")]
 #[inline]
 unsafe fn _mm256_sin_pd(a: __m256d) -> __m256d {
-    // Extract values, apply sin, and create a new vector
+    // Store lanes to scalar array, apply sin, then reload.
+    let mut values = [0.0f64; 4];
+    _mm256_storeu_pd(values.as_mut_ptr(), a);
     let mut result = [0.0f64; 4];
     for i in 0..4 {
-        let val = *a.as_ptr().add(i);
-        result[i] = val.sin();
+        result[i] = values[i].sin();
     }
     _mm256_loadu_pd(result.as_ptr())
 }

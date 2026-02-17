@@ -5,7 +5,7 @@
 // more visually appealing than Bessel functions.
 // The implementation is optimized for performance using SIMD instructions where possible.
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", test))]
 use std::arch::x86_64::*;
 
 // Gaussian radial function: R(r) = e^(-alpha * r^2)
