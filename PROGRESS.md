@@ -1,0 +1,381 @@
+# Project Progress (Current Snapshot)
+
+Snapshot date: **February 17, 2026**.
+
+## Documentation Maintenance Rule
+Agents must update this file after each meaningful implementation change.
+
+Required per update:
+1. What changed
+2. Current status (done/in progress)
+3. Known regressions or risks
+4. Next concrete actions
+
+## 1. Current State
+The application is functional and supports:
+- Real-time point-cloud wavefunction visualization
+- Automatic CPU+GPU cooperative scheduling (no manual runtime mode toggle)
+- UI-driven parameter control and presets
+- Adaptive frustum culling
+- Runtime no-readback GPU scheduling with stale-frame tolerance
+
+## 2. Completed (Confirmed in Code)
+- Implemented quantitative scientific-accuracy guardrail system:
+  - fixed failing `src/ui/input_bridge.rs` test signatures so baseline test compilation is green again
+  - added canonical scientific contract doc: `docs/scientific_contract.md`
+  - added scientific support modules:
+    - `tests/scientific/reference.rs`
+    - `tests/scientific/fixtures.rs`
+    - `tests/scientific/tolerances.rs`
+  - added scientific integration gates:
+    - `tests/scientific_cpu_invariants.rs`
+    - `tests/scientific_docs_consistency.rs`
+    - `tests/scientific_gpu_parity_pr.rs`
+    - `tests/scientific_gpu_parity_nightly.rs`
+  - added scientific remediation scripts:
+    - `scripts/scientific/report.sh`
+    - `scripts/scientific/open_or_update_issue.sh`
+  - added PR scientific jobs and nightly scientific workflow:
+    - `.github/workflows/ci.yml` (`scientific-pr-cpu-docs`, `scientific-pr-gpu`)
+    - `.github/workflows/scientific-nightly.yml`
+  - added scientific test configuration environment variable support:
+    - `TRIPPY_BALL_SCI_SAMPLE_LEVEL=pr|nightly`
+    - `TRIPPY_BALL_SCI_OWNER=<github-handle>`
+  - refreshed stale scientific wording in `README.md`, `DOCUMENTATION.md`, and `TECHNICAL_DESIGN.md` to match implemented hydrogenic two-state model
+- Maximal dependency reduction pass completed while preserving full app runtime:
+  - removed direct deps: `egui-winit`, `bytemuck`, `num-complex`, `rand`, `log`, `env_logger`, `criterion`, direct `objc`
+  - added local replacements: `src/ui/input_bridge.rs`, `src/memory/pod.rs`, `src/telemetry.rs`
+  - removed criterion bench target (`benches/wavefunction_benchmark.rs`) and standalone `math_harness` crate files
+  - validation after dependency reduction:
+    - `cargo check --features app`
+    - `cargo check --no-default-features`
+    - `cargo test --lib -- --skip regression_large_position_upload_no_overrun`
+    - `cargo run --release -- --benchmark`
+- Added regression safety net around new local integration layers:
+  - focused unit tests for `src/ui/input_bridge.rs`, `src/memory/pod.rs`, and `src/telemetry.rs`
+  - added CI workflow `.github/workflows/ci.yml` running:
+    - `cargo check --features app`
+    - `cargo check --no-default-features`
+    - `cargo test --lib -- --skip regression_large_position_upload_no_overrun`
+    - macOS benchmark smoke `cargo run --release -- --benchmark`
+- Wavefunction parameter UI (`l`, `m`, `alpha`, `time_factor`)
+- Camera controls (orbit/zoom + auto-rotation)
+- Color mapping controls and schemes
+- Point count scaling up to 1,000,000,000 (configurable logarithmic UI control)
+- CPU batch evaluation with SIMD-aware branches
+- GPU compute evaluator pipeline
+- Preset system for common quantum states
+- In-crate benchmark utilities (criterion bench target removed)
+- `--benchmark` CLI mode in `src/main.rs` wired to `benchmark::quick_benchmark()`
+- `run.sh --benchmark` now maps to a valid runtime benchmark path
+- Warning cleanup completed (`cargo check` now clean with 0 warnings)
+- Legacy alternate shader removed (`src/shaders/compute_wavefunction.wgsl`)
+- Validation completed: `cargo check` and `cargo test` pass after cleanup
+- Frustum culling upgraded to indexed draw with adaptive fallback (inside-sphere bypass, sampling gate, margin-stable boundary test)
+- Point-count UI display upgraded to compact `K/M/B` formatting for readability at high magnitudes
+- Point-density UI now supports manual shorthand input (e.g. `20M`, `1.4K`) in addition to the logarithmic slider
+- Dependency graph trimmed by removing unused direct crates: `cgmath`, `raw-window-handle`, `futures-intrusive`, `special`, and dev crate `approx`
+- Spherical harmonics cache initialization migrated from `once_cell::sync::Lazy` to `std::sync::LazyLock`
+- Validation completed after dependency cleanup: `cargo check`, `cargo check --tests`, `cargo check --benches`
+- Added `src/sim/` runtime layer:
+  - deterministic SoA-friendly point generation
+  - effective render-count clamp for responsiveness
+  - adaptive scheduler with EWMA throughput estimation
+- Fixed GPU overrun regression for `>1_000_000` points by sizing points buffer to full effective count
+- Reworked GPU evaluator for non-blocking range dispatch + in-flight readback queue (`max_in_flight=3`)
+- Added scheduler/runtime diagnostics to UI (frame/gpu/cpu ms, queue depth, stale frames, approx mode, worker utilization)
+- Switched simulation timing to monotonic elapsed time from `simulation_start` in `src/main.rs`
+- Reduced CPU contention in spherical harmonics by replacing global mutex cache with thread-local cache
+- Added shared low-`l` normalization table (`src/math/kernel_tables.rs`) used by CPU spherical-harmonic path
+- Added scheduler unit tests and GPU large-upload regression test scaffold (`#[ignore]` integration test)
+- Validation completed after adaptive-runtime changes:
+  - `cargo check`
+  - `cargo check --tests --benches`
+  - `cargo test --lib`
+  - `cargo run --release -- --benchmark`
+  - `cargo run --release -- --benchmark`
+- Added `src/render_metal/` entrypoint module and switched `src/main.rs` to use `MetalRenderer`
+- Pinned app renderer backend selection to `wgpu::Backends::METAL` via `Renderer::new_with_backends(...)`
+- Added transitional `src/render_metal/metal_painter.rs` (UI ownership in Metal entrypoint)
+- Added initial Metal shader sources:
+  - `src/render_metal/shaders/point.metal`
+  - `src/render_metal/shaders/wavefunction.metal`
+- Added runtime macOS guard in `src/main.rs`
+- Validation completed after Metal-entrypoint scaffolding:
+  - `cargo check`
+  - `cargo test --lib -- --skip regression_large_position_upload_no_overrun`
+  - `cargo run --release -- --benchmark`
+  - `cargo run --release -- --benchmark`
+- Added macOS native Metal dependencies (`metal`, `objc`, `core-graphics-types` target dependencies in `Cargo.toml`)
+- Added `src/render_metal/context.rs`:
+  - creates native Metal device + command queue
+  - compiles both MSL shader sources at startup
+  - builds native render and compute pipeline states
+- Added `src/render_metal/ring_buffer.rs` shared-storage ring scaffold (triple-buffered slots, dynamic growth)
+- Wired native bootstrap into `src/render_metal/mod.rs`:
+  - startup diagnostics logging (device, ring capacity, surface size, pipeline-ready)
+  - surface resize propagation to native context
+  - per-frame ring-slot acquisition based on effective point count
+- Validation completed after native-bootstrap scaffolding:
+  - `cargo fmt --check` (after running `cargo fmt`)
+  - `cargo check`
+  - `cargo test --lib -- --skip regression_large_position_upload_no_overrun`
+  - `cargo run --release -- --benchmark`
+  - `cargo run --release -- --benchmark`
+- Added renderer snapshot accessors in `src/render/` to feed native Metal path (camera uniform, wave state, intensities, positions)
+- Upgraded `src/render_metal/context.rs` from bootstrap-only to active native shadow command path:
+  - uploads point/camera/color/wave uniforms into native shared buffers
+  - dispatches native Metal compute kernel each frame
+  - executes native Metal point draw into an offscreen texture each frame
+  - blits point buffer output into shared ring slots
+  - enforces shadow-pass cap (`MAX_SHADOW_POINTS=200_000`) for bounded overhead
+- Wired active shadow submission into `src/render_metal/mod.rs` render loop, with truncation diagnostics
+- Validation completed after native-shadow submission wiring:
+  - `cargo fmt --check` (after running `cargo fmt`)
+  - `cargo check`
+  - `cargo test --lib -- --skip regression_large_position_upload_no_overrun`
+  - `cargo run --release -- --benchmark`
+  - `cargo run --release -- --benchmark`
+- Added `src/render_metal/surface.rs` with `CAMetalLayer` attachment to the `winit` macOS view
+- Upgraded `render_metal` presentation flow:
+  - native path now acquires `CAMetalDrawable` and presents it directly each frame
+  - native compute + point draw now target visible drawable texture (not only offscreen)
+  - retained `wgpu` render path as runtime fallback if native present path fails
+- Validation completed after native-present cutover:
+  - `cargo fmt --check` (after running `cargo fmt`)
+  - `cargo check`
+  - `cargo test --lib -- --skip regression_large_position_upload_no_overrun`
+  - `cargo run --release -- --benchmark`
+  - `cargo run --release -- --benchmark`
+- Replaced transitional Metal UI bridge with a native Metal egui painter:
+  - added `src/render_metal/shaders/egui.metal`
+  - implemented `src/render_metal/metal_painter.rs` texture cache + mesh upload + clipped indexed draws
+  - added backend-neutral `ui::PreparedUiFrame` in `src/ui/mod.rs` so UI is generated once and consumed by native or fallback renderer
+  - wired native-present path to render egui in the same Metal command buffer before present
+- Validation completed after Metal UI integration:
+  - `cargo fmt`
+  - `cargo check`
+  - `cargo test --lib -- --skip regression_large_position_upload_no_overrun`
+  - `cargo run --release -- --benchmark`
+  - `cargo run --release -- --benchmark`
+- Removed wgpu presentation fallback in `src/render_metal/mod.rs`:
+  - renderer now requires native Metal context/surface and returns explicit `NativeUnavailable` / `NativeFailure` errors
+  - app event loop now exits fail-fast on native render initialization/runtime failure
+  - retained wgpu-based simulation/scheduler internals for now (presentation cutover only)
+- Added targeted `#[allow(dead_code)]` markers on legacy wgpu render-only fields/methods that are intentionally dormant after presentation cutover
+- Removed `egui-wgpu` integration path:
+  - deleted `ui::State` wgpu renderer codepaths (no `render_prepared` / wgpu UI pass)
+  - removed `egui-wgpu` from `Cargo.toml` feature/dependency graph
+  - UI is now prepared via egui + winit and rendered exclusively by Metal painter
+- Converted `src/render/mod.rs::Renderer` to compute/scheduler-focused initialization:
+  - removed wgpu surface/configuration setup from renderer bootstrap (`request_adapter` now surface-independent)
+  - removed obsolete wgpu frame acquisition/present helper methods from renderer API
+  - retained camera, scheduler, and evaluator paths used by current Metal bridge
+- Simplified runtime error handling for presentation cutover:
+  - removed obsolete `SurfaceLost/Outdated/OutOfMemory/Timeout` render error variants
+  - app loop now handles only native Metal unavailability/failure for render errors
+- Refactored `src/render/points.rs` to remove legacy wgpu draw pipeline ownership:
+  - removed point render pipeline/buffer construction and wgpu draw pass code
+  - `PointCloud` now stores simulation/culling data only (positions, normalized intensities, visibility stats)
+  - retained API compatibility for scheduler integration (`new`, `set_point_count`, `update_intensities`, `update_visibility`, debug info)
+  - removed legacy `upload_visible_indices` path from scheduler update flow now that indexed wgpu draw path is fully retired
+- Removed remaining retired wgpu bind-group artifacts from camera/color runtime state:
+  - `src/render/camera.rs` now keeps CPU-side uniform/frustum state only (no bind-group/buffer ownership)
+  - `src/render/color.rs` now stores UI/runtime color settings without wgpu texture/bind-group resources
+  - method signatures were kept compatible with current renderer integration to avoid broad churn
+- Converted scheduler/runtime compute plumbing to backend-agnostic signatures (no `wgpu::Device/Queue` ownership in:
+  - `src/render/mod.rs`
+  - `src/render/gpu_wavefunction.rs`
+  - `src/render/points.rs`
+  - `src/render/camera.rs`
+  - `src/render/color.rs`
+  - `src/benchmark.rs`)
+- Replaced legacy wgpu buffer-pool implementation with backend-agnostic diagnostics holder in `src/render/buffer_pool.rs`
+- Removed `wgpu` and `pollster` from `Cargo.toml` app feature/dependencies
+- Added GPU fine-culling + compaction + indirect draw in native Metal path:
+  - new `src/render_metal/shaders/cull.metal` (`cull_points`, `finalize_cull`)
+  - `src/render_metal/context.rs` now builds cull pipelines and allocates cull/index/indirect buffers
+  - render flow dispatches cull compute -> indirect-args finalize -> `draw_primitives_indirect`
+  - point vertex shader now reads compacted visible-index buffer (`src/render_metal/shaders/point.metal`)
+- Fixed Metal point-struct layout mismatch (`float3` vs Rust packed `[f32; 3]`) by using `packed_float3` in:
+  - `src/render_metal/shaders/point.metal`
+  - `src/render_metal/shaders/wavefunction.metal`
+  - `src/render_metal/shaders/cull.metal`
+- Added CPU-vs-GPU parity coverage:
+  - new `render::gpu_wavefunction::tests::gpu_matches_cpu_reference_samples` in `src/render/gpu_wavefunction.rs`
+  - added `render::gpu_wavefunction::tests::gpu_matches_cpu_reference_lm_grid` sweep for `l<=5`, `m in [-l, l]`
+- Added native GPU cull diagnostics wiring:
+  - `ShadowFrameStats` now carries visible/cull counts and cull ratio from native cull+indirect path
+  - cull diagnostics are sampled from slot-buffered indirect args (stale-tolerant) in `src/render_metal/context.rs`
+  - `PointCloudDebugInfo` now exposes `native_*` cull metrics
+  - UI runtime panel now displays native GPU visible/cull and input/truncation counts
+- Retuned scheduler behavior with dynamic block sizing in `src/sim/scheduler.rs`:
+  - adaptive block-size shrink when CPU workers are underutilized under heavy load
+  - gradual block-size recovery when frame pacing and utilization are stable
+  - added adaptive quality scale for approximation mode under sustained frame/queue pressure
+  - added request-pressure quality cap based on requested/effective ratio (biases down extreme 100M requests)
+  - tightened stale-frame policy by disabling new GPU submissions when queue reaches stale limit
+  - reset stale counter on CPU-only refresh frames to keep stale age bounded when GPU backlog is paused
+  - added scheduler tests for CPU-starvation shrink, quality scaling, and `requested>effective` adaptive-cap behavior
+- Added runtime visibility into scheduler retuning:
+  - `SimulationRuntimeStats` and `PointCloudDebugInfo` now expose current scheduler block size
+  - UI runtime panel now displays current scheduler block size and applied scheduler quality (%)
+- Added runtime-tunable point caps for large-load tuning:
+  - `src/sim/data_layout.rs` now resolves effective-point cap from `TRIPPY_BALL_MAX_RENDER_POINTS` (clamped to `1_000..20_000_000`, default `5_000_000`)
+  - added unit tests for cap parsing/clamping behavior in `sim::data_layout::tests::*`
+  - native Metal shadow/render cap is now independently tunable via `TRIPPY_BALL_NATIVE_SHADOW_POINTS` (clamped to `1_000..5_000_000`, default `5_000_000`)
+  - native bootstrap diagnostics now report active shadow-point limit
+- Tightened stale-frame enforcement:
+  - stale counters in runtime and soak harness now clamp to policy max
+  - GPU submission suppression now triggers at `>= max_stale_frames` to keep stale age bounded
+- Extended soak benchmark reporting:
+  - `--benchmark-soak` now prints per-stage breakdown (requested/effective, avg/p95 frame ms, miss%, approx%, quality range, block-size range, queue/stale maxima)
+- Cleanup pass completed for stale backend artifacts:
+  - removed retired WGSL shader assets (`src/shaders/point.wgsl`, `src/shaders/wavefunction.wgsl`)
+  - refreshed core docs (`README.md`, `DOCUMENTATION.md`, `SYSTEM_ARCHITECTURE.md`, `TECHNICAL_DESIGN.md`, `PREVENTIVE_MEASURES.md`) to reflect Metal-native runtime
+  - cleaned legacy backend wording in runtime module headers/comments
+- Removed duplicated per-frame wavefunction compute in native presentation path:
+  - `render_metal::context::render_presented_frame` now consumes scheduler-updated intensities directly
+  - native presentation path now runs cull/indirect/draw/UI/present only
+  - removed obsolete wave-state handoff from `render_metal::MetalRenderer` and unused wave-state storage in `render::Renderer`
+- Extended shared-kernel-table usage into GPU evaluator path:
+  - `math/kernel_tables.rs` now exposes a flat `f32` normalization table and coverage tests
+  - `render::GpuWavefunctionEvaluator` uploads shared normalization coefficients to Metal buffer `2`
+  - `render_metal/shaders/wavefunction.metal` now consumes table-driven normalization for `l<=5`, with fallback formula outside table range
+- Reduced native render upload pressure by separating static positions from dynamic intensities:
+  - `render_metal::context` now uses distinct position/intensity buffers
+  - position uploads are dirty-driven (point-count/capacity changes) instead of unconditional per-frame rewrites
+  - cull and point shaders now consume separate position/intensity bindings
+- Tightened CPU/GPU parity edge semantics in Metal compute shader:
+  - explicit `|m| > l` guard in spherical-harmonic path
+  - near-origin `theta` handling aligned with CPU semantics (`r <= 1e-10 -> theta = 0`)
+- Additional scheduler overload tuning:
+  - approximation mode now enables after 2 sustained budget misses (was 3)
+  - severe single-frame overload now triggers approximation for exact-mode requests
+  - added scheduler test coverage for severe-overload trigger
+- Converted scheduler GPU evaluator compute/readback path to SoA intensity flow:
+  - `src/render/gpu_wavefunction.rs` now owns separate Metal buffers for positions (`packed_float3`) and intensities (`f32`)
+  - `src/render_metal/shaders/wavefunction.metal` bindings updated to `positions + intensities + params + normalization table`
+  - async staging copies now read back only `f32` intensity ranges (4 bytes/point) instead of full point structs
+- Reduced frame-loop CPU overhead for GPU completion merges:
+  - added `GpuWavefunctionEvaluator::poll_completed_into(...)` to copy completed ranges directly into destination intensity slices
+  - switched `render::Renderer::update_points` and soak benchmark loop to direct-merge polling (removes per-chunk allocation/copy indirection)
+  - removed unused `gpu_ms` payload from `CompletedReadback` to keep warning-free builds
+- Reduced point-cloud diagnostics overhead at large counts:
+  - removed full-frame normalized intensity copy path in `src/render/points.rs`
+  - `PointCloud::update_intensities` now computes sampled normalized intensity stats (min/max/avg/zero estimate)
+  - preserves UI diagnostics while avoiding O(N) normalization/copy churn each frame
+- Retuned scheduler approximation recovery to reduce mode flapping:
+  - added `approx_recovery_streak` hysteresis gate in `src/sim/scheduler.rs`
+  - exact-mode recovery now requires 6 consecutive stable frames with empty queue
+  - added test `sim::scheduler::tests::approximation_recovery_requires_stable_frames`
+- Removed runtime dependency on per-frame GPU->CPU readback:
+  - added no-readback dispatch APIs in `src/render/gpu_wavefunction.rs` (`enqueue_compute_range_no_readback`, `poll_completed_no_readback`)
+  - runtime scheduler path (`src/render/mod.rs`) now uses completion metadata and patches CPU fallback ranges directly into GPU intensity buffer (`upload_intensity_range`)
+  - native render path (`src/render_metal/context.rs`) now consumes evaluator-owned GPU intensity buffer directly when available
+  - benchmark soak path (`src/benchmark.rs`) updated to mirror runtime no-readback scheduling behavior
+- Restored diagnostic consistency after no-readback runtime cutover:
+  - `render::Renderer` now refreshes point-cloud debug intensity stats from evaluator GPU samples (`copy_intensity_sample`) on a throttled cadence
+  - avoids relying on stale CPU mirror values for debug metrics while keeping low overhead
+- Added cap-sweep tuning harness for adaptive fallback profiling:
+  - new CLI mode `--benchmark-cap-sweep` in `src/main.rs`/`src/benchmark.rs`
+  - sweeps effective caps and reports avg/p95/p99 frame ms, miss%, approx%, queue/stale maxima
+  - optional cap override via `TRIPPY_BALL_CAP_SWEEP_CAPS` (comma-separated integer caps)
+  - initial run snapshot:
+    - cap `2_000_000`: avg/p95/p99 `6.018/12.431/12.608 ms`, miss `0.0%`
+    - cap `5_000_000`: avg/p95/p99 `6.432/10.977/49.915 ms`, miss `3.8%`
+    - cap `10_000_000`: avg/p95/p99 `6.152/10.056/42.983 ms`, miss `3.8%`
+- Added timed soak benchmark mode for long-run acceptance testing:
+  - new CLI mode `--benchmark-soak-30m` (alias `--benchmark-soak-timed`) wired in `src/main.rs`
+  - `src/benchmark.rs` now includes `soak_benchmark_30m()` + `soak_benchmark_timed(duration)`
+  - timed soak defaults to 30 minutes and supports override via `TRIPPY_BALL_SOAK_DURATION_SECS` (clamp `10..43200`)
+  - smoke validation run (`TRIPPY_BALL_SOAK_DURATION_SECS=10 cargo run --release -- --benchmark-soak-30m`) summary:
+    - duration target/actual `10.0s / 10.0s`
+    - frame avg/p95/p99 `5.098 / 15.545 / 24.169 ms`
+    - budget miss `3.7%`, approx `43.5%`, queue max `2`, stale max `1`
+- Added coarse visibility-guided block prioritization for scheduled compute:
+  - `PointCloud` now exposes `prioritized_compute_ranges(...)` with validity-aware sequential fallback
+  - `Renderer::update_points` now consumes prioritized ranges for GPU dispatch selection and CPU fallback patching
+  - added `render::points` tests for sequential fallback and visible-block preference
+  - latest soak summary after integration: avg/p95/p99 `5.597/9.592/49.030 ms`, budget misses `3.3%`, stale max `1`
+  - latest cap sweep after integration:
+    - cap `2_000_000`: avg/p95/p99 `5.886/12.279/13.220 ms`, miss `0.0%`
+    - cap `5_000_000`: avg/p95/p99 `6.025/10.170/46.705 ms`, miss `3.8%`
+    - cap `10_000_000`: avg/p95/p99 `6.134/11.570/43.291 ms`, miss `5.0%`
+- Added explicit heavy-load CPU worker engagement test:
+  - `math::tests::heavy_parallel_workload_engages_cpu_workers` now validates all 8 Rayon worker threads receive chunk work under heavy load
+- Extended CPU/GPU parity coverage with spherical-grid samples:
+  - added `render::gpu_wavefunction::tests::gpu_matches_cpu_reference_spherical_grid` covering representative `r/theta/phi` samples, full `l<=5`/`m` sweep, and multiple time/parameter regimes
+  - parity test surfaced `NaN` outputs on origin/pole samples; fixed in `src/render_metal/shaders/wavefunction.metal` by forcing `phi=0` when `x/y` are near zero
+- Coupled runtime compute cap with native drawable cap:
+  - `PointCloud` now supports runtime effective-cap override (`set_effective_cap_override`)
+  - `render::Renderer` now re-syncs evaluator state through `sync_gpu_to_point_cloud` and exposes `set_runtime_effective_cap_override`
+  - `render_metal::MetalRenderer` now applies native shadow limit as runtime compute cap override so scheduler work does not exceed renderable points
+- Added coupled cap-pair sweep benchmark mode:
+  - new CLI mode `--benchmark-cap-pair-sweep` in `src/main.rs`/`src/benchmark.rs` and `run.sh`
+  - sweeps paired simulation/shadow caps and reports coupled-cap latency/miss/approx metrics
+  - latest pair-sweep snapshot:
+    - sim `5_000_000`, shadow `5_000_000` -> coupled `5_000_000`, avg/p95/p99 `6.272/10.164/44.669 ms`, miss `3.8%`
+    - sim `10_000_000`, shadow `5_000_000` -> coupled `5_000_000`, avg/p95/p99 `6.944/12.275/15.725 ms`, miss `1.2%`
+    - sim `2_000_000`, shadow `200_000` -> coupled `200_000`, avg/p95/p99 `2.259/3.437/3.681 ms`, miss `0.0%`
+- Validation completed after evaluator SoA/intensity-readback refactor:
+  - `cargo fmt`
+  - `cargo check`
+  - `cargo test --lib -- --skip regression_large_position_upload_no_overrun`
+  - `cargo run --release -- --benchmark`
+  - `cargo run --release -- --benchmark-stress`
+  - `cargo run --release -- --benchmark-soak`
+  - latest soak summary: avg/p95/p99 `7.474/12.505/77.384 ms`, budget misses `3.3%`, stale max `1`
+  - latest no-readback soak summary: avg/p95/p99 `5.763/10.132/52.680 ms`, budget misses `3.3%`, stale max `1`
+- Validation completed after native-only presentation cutover:
+  - `cargo fmt`
+  - `cargo check`
+  - `cargo test --lib -- --skip regression_large_position_upload_no_overrun`
+  - `cargo run --release -- --benchmark`
+  - `cargo run --release -- --benchmark-stress`
+  - `cargo run --release -- --benchmark-soak`
+  - `cargo run --release -- --benchmark`
+- Validation completed after timed-soak wiring + spherical-grid parity expansion:
+  - `cargo fmt`
+  - `cargo check`
+  - `cargo test --lib -- --skip regression_large_position_upload_no_overrun` (`46 passed; 0 failed; 1 filtered`)
+  - `TRIPPY_BALL_SOAK_DURATION_SECS=10 cargo run --release -- --benchmark-soak-30m`
+  - timed soak summary: avg/p95/p99 `5.098/15.545/24.169 ms`, budget misses `3.7%`, approx `43.5%`, queue max `2`, stale max `1`
+- Validation completed after cap-coupling + cap-pair-sweep integration:
+  - `cargo fmt`
+  - `cargo check`
+  - `cargo test --lib -- --skip regression_large_position_upload_no_overrun` (`47 passed; 0 failed; 1 filtered`)
+  - `cargo run --release -- --benchmark`
+  - `cargo run --release -- --benchmark-stress`
+  - `cargo run --release -- --benchmark-cap-sweep`
+  - `cargo run --release -- --benchmark-cap-pair-sweep`
+  - `cargo run --release -- --benchmark`
+  - full timed soak baseline: `cargo run --release -- --benchmark-soak-30m`
+    - duration target/actual `1800.0s / 1800.1s`
+    - frame avg/p95/p99 `3.772/10.230/24.428 ms`
+    - budget misses `1.9%`, approx `38.5%`, queue max `2`, stale max `1`
+    - non-finite intensity values `0`
+
+## 3. Plan Completion Status
+- Metal-only rendering/compute migration plan is implemented end-to-end.
+- Acceptance coverage now includes parity sweeps, cap sweeps, cap-pair sweeps, and a completed 30-minute timed soak baseline.
+- 100M exact-per-frame remains intentionally non-default; runtime honors the locked policy of exact-preferred with adaptive fallback to preserve frame pacing.
+
+## 4. Known Issues / Risks
+- Large point counts remain highly hardware dependent.
+- Approximation mode and effective-point clamp prioritize responsiveness over strict full-fidelity at extreme requested counts.
+- Benchmark variance still exists due asynchronous GPU completion timing and command-queue behavior.
+- Consecutive stress/soak runs can vary significantly due system load/thermal state; compare trends across repeated runs.
+- UI intensity diagnostics are sampled estimates at high point counts (not full exact aggregates).
+- `egui` paint callbacks (`Primitive::Callback`) are still skipped in the Metal painter (current UI does not rely on them).
+- If native Metal context/surface creation fails at runtime, app now exits instead of falling back to wgpu presentation.
+
+## 5. Optional Next Tuning
+1. Repeat cap-pair sweeps under different thermal states and record median trends per hardware profile.
+2. Add an automated parser/export for benchmark tables to simplify longitudinal regressions.
+3. If needed, tune scheduler recovery/quality thresholds specifically for sustained `5M` coupled-cap workloads.
+
+## 6. Change Log (Documentation Rewrite)
+- Replaced outdated aspirational docs with implementation-aligned documentation.
+- Added mandatory rule requiring agents to keep docs synchronized with development.
+- Added dependency-cleanup snapshot and current build-validation status.
